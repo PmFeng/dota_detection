@@ -1,4 +1,4 @@
-TENSORBOARD_EXPERIMENT: "/home/sgiit/disk_2T/Train_Models/DOTA/logs/dota_dcn_weightAL5"
+TENSORBOARD_EXPERIMENT: "/home/sgiit/disk_2T/Train_Models/DOTA/logs/dota_dcn_weightAL8"
 INPUT:
   MIN_SIZE_TRAIN: (800,)
   MAX_SIZE_TRAIN: 800
@@ -21,9 +21,11 @@ MODEL:
     PRE_NMS_TOP_N_TEST: 1000
     POST_NMS_TOP_N_TEST: 1000
     FPN_POST_NMS_TOP_N_TEST: 1000
+    ASPECT_RATIOS: (1.0, )
   ROI_HEADS:
     USE_FPN: True
     LAMDA_INTEGRATED: True
+    BBOX_REG_WEIGHTS: (10.0, 10.0, 5.0, 5.0, 8.0)
   ROI_BOX_HEAD:
     POOLER_RESOLUTION: 7
     POOLER_SCALES: (0.25, 0.125, 0.0625, 0.03125)
@@ -36,6 +38,7 @@ DATASETS:
   TEST: ("dota_val",)
 DATALOADER:
   SIZE_DIVISIBILITY: 32
+  ASPECT_RATIO_GROUPING: False
 SOLVER:
   # Assume 8 gpus
   BASE_LR: 0.01

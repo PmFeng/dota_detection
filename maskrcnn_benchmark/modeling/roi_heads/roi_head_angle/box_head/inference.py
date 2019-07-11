@@ -6,7 +6,7 @@ import numpy as np
 from maskrcnn_benchmark.structures.bounding_box import BoxList
 from maskrcnn_benchmark.structures.boxlist_ops import boxlist_nms
 from maskrcnn_benchmark.structures.boxlist_ops import cat_boxlist
-from maskrcnn_benchmark.modeling.box_coder_with_angle import BoxCoder
+from maskrcnn_benchmark.modeling.box_coder_with_constrained_and_diff_angle import BoxCoder
 
 
 class PostProcessor_(nn.Module):
