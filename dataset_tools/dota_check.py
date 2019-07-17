@@ -1,18 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Sat Jul  6 10:58:51 2019
+Created on Fri Jul 12 22:09:09 2019
 
 @author: sgiit
 """
 
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Sun Jun 23 11:58:50 2019
-
-@author: pengming
-"""
 
 import os
 
@@ -31,9 +24,6 @@ else:
     import xml.etree.ElementTree as ET
     
 
-
-
-#from maskrcnn_benchmark.structures.bounding_box import BoxList
 
 root = '/home/pengming/HRSC2016/FullDataSet'
 class DOTA_Dataset(torch.utils.data.Dataset):
@@ -102,20 +92,6 @@ class DOTA_Dataset(torch.utils.data.Dataset):
         anno = ET.parse(self._annopath % img_id).getroot()
         anno = self._preprocess_annotation(anno)
 
-#        height, width = anno["im_info"]
-#        target = BoxList(anno["boxes"], (width, height), mode="xyxy")
-#        target.add_field("labels", anno["labels"])
-#        target.add_field("difficult", anno["difficult"])
-        
-#        img_id = self.ids[index]
-#        anno = ET.parse(self._annopath % img_id).getroot()
-#        anno = self._preprocess_annotation(anno)
-#
-#        height, width = anno["im_info"]
-#        target = BoxList(anno["boxes"], (width, height), mode="xyxy")
-#        target.add_field("labels", anno["labels"])
-#        target.add_field("difficult", anno["difficult"])
-#        return target
         
         height, width = anno["im_info"]
         target = BoxList(anno["hrbb_boxes"], (width, height), mode="xyxy")        
@@ -203,14 +179,6 @@ class DOTA_Dataset(torch.utils.data.Dataset):
             
             theta = math.degrees(theta)
             
-            if theta > 90.0:
-                theta -= 180
-            elif theta < -90.0:
-                theta += 180
-            elif theta == -90.0:
-                theta = 90
-            
-            
             thetas.append(theta)
             
             
@@ -244,15 +212,23 @@ class DOTA_Dataset(torch.utils.data.Dataset):
     def map_class_id_to_class_name(self, class_id):
         return DOTA_Dataset.CLASSES[class_id]
     
-    
-#for index in range(len(data_loader.dataset.ids)):
-#    img_id = data_loader.dataset.ids[index]
-#    anno = ET.parse(data_loader.dataset._annopath % img_id).getroot()  
-#    anno = data_loader.dataset._preprocess_annotation(anno)
-#    height, width = anno["im_info"]
-#    target = BoxList(anno["hrbb_boxes"], (width, height), mode="xyxy")        
-#    obb_target = BoxList(anno["obb_boxes"], (width, height), mode="xywh")
-#    target.add_field("obb_boxes", obb_target)   
-#    target.add_field("labels", anno["labels"])
-#    target.add_field("difficult", anno["difficult"])
-#    target.add_field("theta", anno["theta"])
+root = "/home/sgiit/disk_2T/DataSet/rssrai2019_object_detection/data_split_800/train"
+
+dataset = DOTA_Dataset(root, 'train', use_difficult=True)
+names_count = {}
+import tqdm
+for i in tqdm.tqdm(range(len(dataset))):
+    label = dataset.get_groundtruth(i)
+    names = label.get_field('labels')
+    for name in names:
+        id_ = dataset.CLASSES[name]
+        if id_ in names_count.keys():
+            names_count[id_] += 1
+        else:
+            names_count[id_] = 1
+
+import matplotlib.pyplot as plt
+#%matplotlib qt 
+
+plt.bar(list(names_count.keys()), names_count.values(), color='g')
+plt.show()   

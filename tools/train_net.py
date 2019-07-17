@@ -9,7 +9,7 @@ from maskrcnn_benchmark.utils.env import setup_environment  # noqa F401 isort:sk
 
 import argparse
 import os
-
+import glob
 import torch
 from maskrcnn_benchmark.config import cfg
 from maskrcnn_benchmark.data import make_data_loader
@@ -35,7 +35,7 @@ except ImportError:
     raise ImportError('Use APEX for multi-precision via apex.amp')
 
 
-def train(cfg, local_rank, distributed, use_tensorboard=False):
+def train(cfg, local_rank, distributed, resume, ckpt, use_tensorboard=False):
     model = build_detection_model(cfg)
     device = torch.device(cfg.MODEL.DEVICE)
     model.to(device)
@@ -61,12 +61,23 @@ def train(cfg, local_rank, distributed, use_tensorboard=False):
     output_dir = cfg.OUTPUT_DIR
 
     save_to_disk = get_rank() == 0
+    
+
     checkpointer = DetectronCheckpointer(
         cfg, model, optimizer, scheduler, output_dir, save_to_disk
     )
+    
     extra_checkpoint_data = checkpointer.load(cfg.MODEL.WEIGHT)
     arguments.update(extra_checkpoint_data)
-
+    
+    if resume:
+        ckpt = ckpt
+        list_of_files = glob.glob(ckpt)
+        _ = checkpointer.load(ckpt, use_latest=False)
+        list_of_files = glob.glob(ckpt)
+        latest_file = max(list_of_files, key=os.path.getctime)
+        arguments["iteration"] = int(latest_file.split('/')[-1].split('_')[1].split('.')[0]) + 1
+        
     data_loader = make_data_loader(
         cfg,
         is_train=True,
@@ -161,7 +172,19 @@ def main():
         action="store_true",
         default=True
     )
-
+#    parser.add_argument(
+#        "--resume",
+#        help="resume training flag",
+#        action="store_true",
+#        default=True
+#    )
+#    parser.add_argument(
+#        "--ckpt",
+#        help="model dir for resume",
+#        type=str,
+#        default='/home/sgiit/disk_2T/Train_Models/DOTA/dota_dconv_R_50_FPN_1x'
+#    )
+    
     args = parser.parse_args()
 
     num_gpus = int(os.environ["WORLD_SIZE"]) if "WORLD_SIZE" in os.environ else 1
@@ -206,7 +229,9 @@ def main():
         cfg=cfg,
         local_rank=args.local_rank,
         distributed=args.distributed,
-        use_tensorboard=args.use_tensorboard
+        use_tensorboard=args.use_tensorboard,
+        resume=False,
+        ckpt='/home/sgiit/disk_2T/Train_Models/DOTA/dota_dconv_R_50_FPN_1x/*.pth',
     )
 
     if not args.skip_test:

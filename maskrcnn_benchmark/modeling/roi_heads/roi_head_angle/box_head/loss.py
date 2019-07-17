@@ -3,7 +3,8 @@ import torch
 from torch.nn import functional as F
 
 from maskrcnn_benchmark.layers import smooth_l1_loss
-from maskrcnn_benchmark.modeling.box_coder_with_constrained_and_diff_angle import BoxCoder
+#from maskrcnn_benchmark.modeling.box_coder_with_constrained_and_diff_angle import BoxCoder
+from maskrcnn_benchmark.modeling.box_coder_with_angle import BoxCoder
 from maskrcnn_benchmark.modeling.matcher import Matcher
 from maskrcnn_benchmark.structures.boxlist_ops import boxlist_iou
 from maskrcnn_benchmark.modeling.balanced_positive_negative_sampler import (
@@ -259,8 +260,10 @@ class FastRCNNLossComputation(object):
         if self.cls_agnostic_bbox_reg:
             map_inds = torch.tensor([5, 6, 7, 8, 9], device=device)
         else:
-            map_inds = 6 * labels_pos[:, None] + torch.tensor(
-                [0, 1, 2, 3, 4, 5], device=device)
+#            map_inds = 6 * labels_pos[:, None] + torch.tensor(
+#                [0, 1, 2, 3, 4, 5], device=device)
+            map_inds = 5 * labels_pos[:, None] + torch.tensor(
+                [0, 1, 2, 3, 4], device=device)
 
         box_loss = smooth_l1_loss(
             box_regression[sampled_pos_inds_subset[:, None], map_inds],

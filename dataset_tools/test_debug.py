@@ -35,7 +35,7 @@ except ImportError:
 parser = argparse.ArgumentParser(description="PyTorch Object Detection Inference")
 parser.add_argument(
     "--config-file",
-    default="/home/sgiit/disk_1T/sgiit/Pengming_Feng/GitClone/ship_detection_optical/configs/ship_detection_net/box_coder_with_no_integrated_constrained_angle_diff.yaml",
+    default="/home/sgiit/disk_1T/sgiit/Pengming_Feng/GitClone/dota_detection/configs/ship_detection_net/dota_e2e_faster_rcnn_dconv_R_50_FPN_1x.yaml",
     metavar="FILE",
     help="path to config file",
 )
@@ -43,7 +43,7 @@ parser.add_argument("--local_rank", type=int, default=0)
 parser.add_argument(
     "--ckpt",
     help="The path to the checkpoint for test, default is the latest checkpoint.",
-    default='training_dir/ship_detect_weightAL8_no_integrated_diff_constrained/model_final.pth',
+    default='/home/sgiit/disk_2T/Train_Models/DOTA/dota_dconv_R_50_FPN_1x/model_0380000.pth',
 )
 parser.add_argument(
     "opts",
@@ -327,12 +327,12 @@ while i < size_data:
                 big_box[2]-big_box[0],
                 big_box[3]-big_box[1],
                 ]
-        #cv.drawContours(img,[box],0,(0,255,255),2)
+        cv.drawContours(img,[box],0,(0,255,255),2)
         label = "d:{:.1f}".format(angle)
-        cv.putText(img, label, (rc_box[0], rc_box[1] - 2), 0, 0.5, [225, 255, 255], 2)
-        cv.rectangle(img, (big_box[0], big_box[1]), (big_box[2], big_box[3]), (0,255,0), 2)
+#        cv.putText(img, label, (rc_box[0], rc_box[1] - 2), 0, 0.5, [225, 255, 255], 2)
+#        cv.rectangle(img, (big_box[0], big_box[1]), (big_box[2], big_box[3]), (0,255,0), 2)
 #        box_recover = hrbb_anchor2obb_anchor(big_box_xywh, angle)
-#        cv.drawContours(img,[box_recover],0,(0,0,255),2)
+#        cv.drawContours(img,[box_recover],0,(0,255,255),2)
         
         #cv.rectangle(img, (rc_box[0], rc_box[1]), (rc_box[2], rc_box[3]), (0,255,0), 2)
         #cv.rectangle(img, (rc_tota[0], rc_tota[1]), (rc_tota[2], rc_tota[3]), (255,0,0), 2)
@@ -355,10 +355,10 @@ while i < size_data:
         print(box_recover.shape)
         cv.drawContours(img,[box_recover],0,(0,0,255),2)
         label = "pd:{:.1f},h:{:.1f},w:{:.1f}".format(theta, h, w)
-        cv.putText(img, label, (bbox[0], bbox[3] + 30), 0, 0.5, [225, 0, 255], 2)
+#        cv.putText(img, label, (bbox[0], bbox[3] + 30), 0, 0.5, [225, 0, 255], 2)
         label = "H:{},W:{}".format(box_xywh[3], box_xywh[2])
-        cv.putText(img, label, (bbox[0]+ box_xywh[2]//2, bbox[1] - 5), 0, 0.5, [225, 255, 255], 2)
-        cv.rectangle(img, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (255,255,0), 2)
+#        cv.putText(img, label, (bbox[0]+ box_xywh[2]//2, bbox[1] - 5), 0, 0.5, [225, 255, 255], 2)
+#        cv.rectangle(img, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (255,255,0), 2)
     
     
     

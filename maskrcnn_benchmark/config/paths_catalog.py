@@ -125,7 +125,7 @@ class DatasetCatalog(object):
         },
         "dota_val":{
             "split": "val",
-            "img_dir": "/home/sgiit/disk_2T/DataSet/rssrai2019_object_detection/data_split_800/val",
+            "img_dir": "/home/sgiit/disk_2T/DataSet/rssrai2019_object_detection/data_split/val",
         }
     }
 

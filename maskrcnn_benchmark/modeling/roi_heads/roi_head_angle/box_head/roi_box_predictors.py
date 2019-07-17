@@ -41,7 +41,7 @@ class FPNPredictorWithAngleIntegrated(nn.Module):
 
         self.cls_score = nn.Linear(representation_size, num_classes)
         num_bbox_reg_classes = 2 if cfg.MODEL.CLS_AGNOSTIC_BBOX_REG else num_classes
-        self.bbox_pred = nn.Linear(representation_size, num_bbox_reg_classes * 6)
+        self.bbox_pred = nn.Linear(representation_size, num_bbox_reg_classes * 5)
 
         nn.init.normal_(self.cls_score.weight, std=0.01)
         nn.init.normal_(self.bbox_pred.weight, std=0.001)
