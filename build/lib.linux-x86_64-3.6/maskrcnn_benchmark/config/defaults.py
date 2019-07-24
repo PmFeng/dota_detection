@@ -175,7 +175,7 @@ _C.MODEL.RPN.RPN_HEAD = "SingleConvRPNHead"
 # ROI HEADS options
 # ---------------------------------------------------------------------------- #
 _C.MODEL.ROI_HEADS = CN()
-_C.MODEL.LAMDA_INTEGRATED = True
+_C.MODEL.ROI_HEADS.LAMDA_INTEGRATED = True
 
 _C.MODEL.ROI_HEADS.USE_FPN = False
 # Overlap threshold for an RoI to be considered foreground (if >= FG_IOU_THRESHOLD)
@@ -456,6 +456,13 @@ _C.TEST.BBOX_AUG.SCALE_H_FLIP = False
 _C.OUTPUT_DIR = "."
 
 _C.PATHS_CATALOG = os.path.join(os.path.dirname(__file__), "paths_catalog.py")
+
+
+# TensorBoard experiment location
+_C.TENSORBOARD_EXPERIMENT = "logs/maskrcnn-benchmark"
+
+
+
 
 # ---------------------------------------------------------------------------- #
 # Precision options

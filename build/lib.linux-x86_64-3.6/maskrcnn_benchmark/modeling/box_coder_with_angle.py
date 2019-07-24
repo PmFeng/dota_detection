@@ -29,6 +29,8 @@ class BoxCoder(object):
         self.weights = weights
         self.bbox_xform_clip = bbox_xform_clip
 
+#matched_targets.bbox, proposals_per_image.bbox, gt_theta
+
     def encode(self, reference_boxes, proposals, gt_theta):
         """
         Encode a set of proposals with respect to some
@@ -38,6 +40,7 @@ class BoxCoder(object):
             reference_boxes (Tensor): reference boxes
             proposals (Tensor): boxes to be encoded
         """
+        
         
 
         TO_REMOVE = 1  # TODO remove
@@ -70,7 +73,7 @@ class BoxCoder(object):
     
    
 
-    def decode(self, rel_codes, boxes, pre_lambda):
+    def decode(self, rel_codes, boxes):
         """
         From a set of original boxes and encoded relative box offsets,
         get the decoded boxes.
@@ -89,26 +92,41 @@ class BoxCoder(object):
         ctr_y = boxes[:, 1] + 0.5 * heights
 
         wx, wy, ww, wh, wl = self.weights
-        dx = rel_codes[:, 0::4] / wx
-        dy = rel_codes[:, 1::4] / wy
-        dw = rel_codes[:, 2::4] / ww
-        dh = rel_codes[:, 3::4] / wh
+        dx = rel_codes[:, 0::5] / wx
+        dy = rel_codes[:, 1::5] / wy
+        dw = rel_codes[:, 2::5] / ww
+        dh = rel_codes[:, 3::5] / wh
+        dl = rel_codes[:, 4::5] / wl
         # Prevent sending too large values into torch.exp()
         dw = torch.clamp(dw, max=self.bbox_xform_clip)
         dh = torch.clamp(dh, max=self.bbox_xform_clip)
+        dl = torch.clamp(dl, -1, 1)
+
 
         pred_ctr_x = dx * widths[:, None] + ctr_x[:, None]
         pred_ctr_y = dy * heights[:, None] + ctr_y[:, None]
         pred_w = torch.exp(dw) * widths[:, None]
         pred_h = torch.exp(dh) * heights[:, None]
         
-        pred_theta = torch.clamp(pre_lambda / wl, -1, 1) * 90 
+        pred_theta = dl * 90 
 
-        pred_boxes = torch.zeros_like(rel_codes)
-        # x1
-        pred_boxes[:, 0::4] = pred_ctr_x - 0.5 * pred_w
+        #pred_boxes = torch.zeros_like(rel_codes)
+        shape_pre = rel_codes.size()
+        #print("======================================: {}".format(int(shape_pre[1]/5*4)))
+        pred_boxes = rel_codes.new(shape_pre[0], int(shape_pre[1]/5*4))
+#        # x1
+#        pred_boxes[:, 0::5] = pred_ctr_x - 0.5 * pred_w
+#        # y1
+#        pred_boxes[:, 1::5] = pred_ctr_y - 0.5 * pred_h
+#        # x2 (note: "- 1" is correct; don't be fooled by the asymmetry)
+#        pred_boxes[:, 2::5] = pred_ctr_x + 0.5 * pred_w - 1
+#        # y2 (note: "- 1" is correct; don't be fooled by the asymmetry)
+#        pred_boxes[:, 3::5] = pred_ctr_y + 0.5 * pred_h - 1
+        
+                # x1
+        pred_boxes[:, 0::4] = pred_ctr_x - 0.5 * pred_w 
         # y1
-        pred_boxes[:, 1::4] = pred_ctr_y - 0.5 * pred_h
+        pred_boxes[:, 1::4] = pred_ctr_y - 0.5 * pred_h 
         # x2 (note: "- 1" is correct; don't be fooled by the asymmetry)
         pred_boxes[:, 2::4] = pred_ctr_x + 0.5 * pred_w - 1
         # y2 (note: "- 1" is correct; don't be fooled by the asymmetry)

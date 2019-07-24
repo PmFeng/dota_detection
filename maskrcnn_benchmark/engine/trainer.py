@@ -50,12 +50,13 @@ def do_train(
     logger = logging.getLogger("maskrcnn_benchmark.trainer")
     logger.info("Start training")
     #meters = MetricLogger(delimiter="  ")
-    
     max_iter = len(data_loader)
     start_iter = arguments["iteration"]
     model.train()
     start_training_time = time.time()
     end = time.time()
+    min_loss = 100000.0
+    loss_v = 0.0
     for iteration, (images, targets, _) in enumerate(data_loader, start_iter):
         
         if any(len(target) < 1 for target in targets):
@@ -73,7 +74,8 @@ def do_train(
         loss_dict = model(images, targets)
 
         losses = sum(loss for loss in loss_dict.values())
-
+        
+        
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = reduce_loss_dict(loss_dict)
         losses_reduced = sum(loss for loss in loss_dict_reduced.values())
@@ -92,7 +94,13 @@ def do_train(
 
         eta_seconds = meters.time.global_avg * (max_iter - iteration)
         eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
-
+        
+        loss_v = losses.item()
+        if loss_v < min_loss:
+            #print(loss_v)
+            checkpointer.save("model_best", **arguments)
+            min_loss = loss_v
+            
         if iteration % 20 == 0 or iteration == max_iter:
             logger.info(
                 meters.delimiter.join(
@@ -115,6 +123,10 @@ def do_train(
             checkpointer.save("model_{:07d}".format(iteration), **arguments)
         if iteration == max_iter:
             checkpointer.save("model_final", **arguments)
+            
+        
+
+            
 
     total_training_time = time.time() - start_training_time
     total_time_str = str(datetime.timedelta(seconds=total_training_time))

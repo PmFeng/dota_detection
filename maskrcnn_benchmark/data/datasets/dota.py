@@ -25,6 +25,7 @@ import cv2 as cv
 import math
 import numpy as np
 
+
 if sys.version_info[0] == 2:
     import xml.etree.cElementTree as ET
 else:
@@ -116,6 +117,14 @@ class DOTA_Dataset(torch.utils.data.Dataset):
 #        target.add_field("labels", anno["labels"])
 #        target.add_field("difficult", anno["difficult"])
 #        return target
+        
+#        if anno["hrbb_boxes"].size(0) > 700:
+#            fix_ind = np.random.randint(0, high=anno["hrbb_boxes"].size(0), size=700, dtype='l')
+#            anno["hrbb_boxes"] = anno["hrbb_boxes"][fix_ind]
+#            anno["obb_boxes"] = anno["obb_boxes"][fix_ind]
+#            anno["labels"] = anno["labels"][fix_ind]
+#            anno["difficult"] = anno["difficult"][fix_ind]
+#            anno["theta"] = anno["theta"][fix_ind]
         
         height, width = anno["im_info"]
         target = BoxList(anno["hrbb_boxes"], (width, height), mode="xyxy")        

@@ -6,10 +6,11 @@ import numpy as np
 from maskrcnn_benchmark.structures.bounding_box import BoxList
 from maskrcnn_benchmark.structures.boxlist_ops import boxlist_nms
 from maskrcnn_benchmark.structures.boxlist_ops import cat_boxlist
-from maskrcnn_benchmark.modeling.box_coder import BoxCoder
+#from maskrcnn_benchmark.modeling.box_coder_with_constrained_and_diff_angle import BoxCoder
+from maskrcnn_benchmark.modeling.box_coder_with_angle import BoxCoder
 
 
-class PostProcessor(nn.Module):
+class PostProcessor_(nn.Module):
     """
     From a set of classification scores, box regression and proposals,
     computes the post-processed boxes, and applies NMS to obtain the
@@ -33,7 +34,7 @@ class PostProcessor(nn.Module):
             detections_per_img (int)
             box_coder (BoxCoder)
         """
-        super(PostProcessor, self).__init__()
+        super(PostProcessor_, self).__init__()
         self.score_thresh = score_thresh
         self.nms = nms
         self.detections_per_img = detections_per_img
@@ -44,7 +45,7 @@ class PostProcessor(nn.Module):
         self.bbox_aug_enabled = bbox_aug_enabled
         self.lambda_integrated = lambda_integrated
         
-    def forward_integrated(self, x, boxes, angle):
+    def forward_integrated(self, x, boxes):
         """
         Arguments:
             x (tuple[tensor, tensor]): x contains the class logits
@@ -69,27 +70,31 @@ class PostProcessor(nn.Module):
 
         if self.cls_agnostic_bbox_reg:
             box_regression = box_regression[:, -4:]
-        proposals = self.box_coder.decode(
+        proposals, pre_thetas = self.box_coder.decode(
             box_regression.view(sum(boxes_per_image), -1), concat_boxes
         )
+        
+        # TODO cls_agnostic_bbox_reg for theta
         if self.cls_agnostic_bbox_reg:
             proposals = proposals.repeat(1, class_prob.shape[1])
 
         num_classes = class_prob.shape[1]
 
         proposals = proposals.split(boxes_per_image, dim=0)
+        pre_thetas = pre_thetas.split(boxes_per_image, dim=0)
         class_prob = class_prob.split(boxes_per_image, dim=0)
 
         results = []
-        for prob, boxes_per_img, image_shape in zip(
-            class_prob, proposals, image_shapes
+        for prob, boxes_per_img, image_shape, lambda_ in zip(
+            class_prob, proposals, image_shapes, pre_thetas
         ):
-            boxlist = self.prepare_boxlist(boxes_per_img, prob, image_shape)
+            boxlist = self.prepare_boxlist(boxes_per_img, prob, image_shape, lambda_)
             boxlist = boxlist.clip_to_image(remove_empty=False)
             if not self.bbox_aug_enabled:  # If bbox aug is enabled, we will do it later
                 boxlist = self.filter_results(boxlist, num_classes)
-            results.append(boxlist)
-        return results        
+            results.append(boxlist)      
+            
+        return results 
         
     
     def forward_no_integrated(self, x, boxes):   
@@ -107,7 +112,7 @@ class PostProcessor(nn.Module):
 
         class_logits, box_regression, lambda_regression = x
         class_prob = F.softmax(class_logits, -1)
-        lambda_reg = F.sigmoid(lambda_regression, -1)
+        lambda_reg = lambda_regression
             
        
         
@@ -120,19 +125,21 @@ class PostProcessor(nn.Module):
             box_regression = box_regression[:, -4:]
         
         proposals, angle = self.box_coder.decode(
-            box_regression.view(sum(boxes_per_image), -1), concat_boxes
+            box_regression.view(sum(boxes_per_image), -1), 
+            lambda_reg.view(sum(boxes_per_image), -1), 
+            concat_boxes
         )
 
         num_classes = class_prob.shape[1]
 
         proposals = proposals.split(boxes_per_image, dim=0)
         class_prob = class_prob.split(boxes_per_image, dim=0)
-        lambda_reg = lambda_reg.split(boxes_per_image, dim=0)
+        angle = angle.split(boxes_per_image, dim=0)
 
 
         results = []
         for prob, boxes_per_img, image_shape, lambda_ in zip(
-            class_prob, proposals, image_shapes, lambda_reg
+            class_prob, proposals, image_shapes, angle
         ):
             boxlist = self.prepare_boxlist(boxes_per_img, prob, image_shape, lambda_)
             boxlist = boxlist.clip_to_image(remove_empty=False)
@@ -157,13 +164,13 @@ class PostProcessor(nn.Module):
                 the extra fields labels and scores
         """
         if self.lambda_integrated:
-            results = forward_integrated(x, boxes)
+            results = self.forward_integrated(x, boxes)
         else:
-            results = forward_no_integrated(x, boxes)
+            results = self.forward_no_integrated(x, boxes)
 
         return results
 
-    def prepare_boxlist(self, boxes, scores, image_shape, lambda_=None):
+    def prepare_boxlist(self, boxes, scores, image_shape, lambda_):
         """
         Returns BoxList from `boxes` and adds probability scores information
         as an extra field
@@ -177,12 +184,13 @@ class PostProcessor(nn.Module):
         box at `boxes[i, j * 4:(j + 1) * 4]`.
         """
         boxes = boxes.reshape(-1, 4)
-        scores = scores.reshape(-1)
+        #print("+++++++++++++++++++++", scores.size())
+        lambda_ = lambda_.reshape(-1)
+        scores = scores.reshape(-1) 
         boxlist = BoxList(boxes, image_shape, mode="xyxy")
         boxlist.add_field("scores", scores)
-        if lambda_:
-            theta = torch.asin(lambda_)
-            boxlist.add_field("theta", lambda_)
+        
+        boxlist.add_field("theta", lambda_)
         return boxlist
 
     def filter_results(self, boxlist, num_classes):
@@ -191,8 +199,10 @@ class PostProcessor(nn.Module):
         """
         # unwrap the boxlist to avoid additional overhead.
         # if we had multi-class NMS, we could perform this directly on the boxlist
+        #boxlist = boxlist.convert("xyxy")
         boxes = boxlist.bbox.reshape(-1, num_classes * 4)
         scores = boxlist.get_field("scores").reshape(-1, num_classes)
+        lambda_ = boxlist.get_field("theta").reshape(-1, num_classes)
 
         device = scores.device
         result = []
@@ -202,9 +212,11 @@ class PostProcessor(nn.Module):
         for j in range(1, num_classes):
             inds = inds_all[:, j].nonzero().squeeze(1)
             scores_j = scores[inds, j]
+            lambda_j = lambda_[inds, j]
             boxes_j = boxes[inds, j * 4 : (j + 1) * 4]
             boxlist_for_class = BoxList(boxes_j, boxlist.size, mode="xyxy")
             boxlist_for_class.add_field("scores", scores_j)
+            boxlist_for_class.add_field("theta", lambda_j)
             boxlist_for_class = boxlist_nms(
                 boxlist_for_class, self.nms
             )
@@ -255,14 +267,6 @@ def hrbb_anchor2obb_anchor(proposal, angle):
     
     
 
-    
-    
-    
-
-
-
-
-
 
 
 
@@ -281,7 +285,7 @@ def make_roi_box_post_processor(cfg):
     
     lambda_integrated = cfg.MODEL.ROI_HEADS.LAMDA_INTEGRATED
         
-    postprocessor = PostProcessor(
+    postprocessor = PostProcessor_(
         score_thresh,
         nms_thresh,
         detections_per_img,

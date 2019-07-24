@@ -3,5 +3,6 @@ from .coco import COCODataset
 from .voc import PascalVOCDataset
 from .concat_dataset import ConcatDataset
 from .hrsc import HRSC_Dataset
+from .dota import DOTA_Dataset
 
-__all__ = ["COCODataset", "ConcatDataset", "PascalVOCDataset", "HRSC_Dataset"]
+__all__ = ["COCODataset", "ConcatDataset", "PascalVOCDataset", "HRSC_Dataset", "DOTA_Dataset"]

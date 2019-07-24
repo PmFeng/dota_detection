@@ -29,6 +29,38 @@ else:
 
 root = '/home/pengming/HRSC2016/FullDataSet'
 class HRSC_Dataset(torch.utils.data.Dataset):
+    
+    CLASSES_index = {
+             1: 1,
+             2: 2,
+             3: 3,
+             4: 4,
+             5: 5,
+             6: 6,
+             7: 7,
+             8: 8,
+             9: 9,
+             10: 10,
+             11: 11,
+             12: 12,
+             13: 13,
+             15: 14,
+             16: 15,
+             17: 16,
+             18: 17,
+             19: 18,
+             20: 19,
+             22: 20,
+             24: 21,
+             25: 22,
+             26: 23,
+             27: 24,
+             28: 25,
+             29: 26,
+             30: 27,
+             32: 28,
+             0: 0
+            }
 
     CLASSES = (
         "__background__ ",
@@ -60,7 +92,6 @@ class HRSC_Dataset(torch.utils.data.Dataset):
         "sheep1",
         "sofa1",
         "train1",
-        "tvmonitor1",
     )
 
     def __init__(self, data_dir, split, use_difficult=False, transforms=None):
@@ -79,6 +110,7 @@ class HRSC_Dataset(torch.utils.data.Dataset):
         self.id_to_img_map = {k: v for k, v in enumerate(self.ids)}
 
         cls = HRSC_Dataset.CLASSES
+        cls_index = HRSC_Dataset.CLASSES_index
         self.class_to_ind = dict(zip(cls, range(len(cls))))
         self.categories = dict(zip(range(len(cls)), cls))
 
@@ -87,7 +119,7 @@ class HRSC_Dataset(torch.utils.data.Dataset):
         img = Image.open(self._imgpath % img_id).convert("RGB")
 
         target = self.get_groundtruth(index)
-#        target = target.clip_to_image(remove_empty=True)
+        target = target.clip_to_image(remove_empty=True)
 
         if self.transforms is not None:
             img, target = self.transforms(img, target)
@@ -209,7 +241,7 @@ class HRSC_Dataset(torch.utils.data.Dataset):
             obb_boxes.append(obb_bndbox)
             hbb_boxes.append(hrbb_bndbox)
             #gt_classes.append(self.class_to_ind[name])
-            gt_classes.append(int(name)-100000000)
+            gt_classes.append(HRSC_Dataset.CLASSES_index[int(name)-100000000])
             difficult_boxes.append(difficult)
             
             

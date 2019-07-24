@@ -49,8 +49,8 @@ class BoxCoder(object):
         ex_ctr_x = proposals[:, 0] + 0.5 * ex_widths
         ex_ctr_y = proposals[:, 1] + 0.5 * ex_heights
         
-        ex_alpha = torch.atan(ex_heights/ex_widths) * 180 / 3.141592653589793
-        p = gt_theta/ex_alpha
+#        ex_alpha = torch.atan(ex_heights/ex_widths) * 180 / 3.141592653589793
+        
         
         #ex_lambda = ex_theta/180*np.pi
         #ex_lambda = ex_theta/90
@@ -59,6 +59,7 @@ class BoxCoder(object):
         gt_heights = reference_boxes[:, 3] - reference_boxes[:, 1] + TO_REMOVE
         gt_ctr_x = reference_boxes[:, 0] + 0.5 * gt_widths
         gt_ctr_y = reference_boxes[:, 1] + 0.5 * gt_heights
+        
         
         #gt_lambda = gt_theta/180*np.pi
 #        gt_lambda = gt_theta/90
@@ -70,6 +71,10 @@ class BoxCoder(object):
         targets_dh = wh * torch.log(gt_heights / ex_heights)
         #targets_dlamda = wl * (torch.sin(gt_lambda) - torch.sin(ex_lambda))
 #        target_dlamda = wl * (ex_lambda - gt_lambda)
+        
+        ex_alpha = kornia.rad2deg(torch.atan(targets_dh/targets_dw))
+        p = gt_theta/ex_alpha
+        
         targets_dlamda = wl * p 
         
 #        targets_dlamda = wl * gt_lambda

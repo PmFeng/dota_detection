@@ -35,7 +35,7 @@ except ImportError:
 parser = argparse.ArgumentParser(description="PyTorch Object Detection Inference")
 parser.add_argument(
     "--config-file",
-    default="/home/sgiit/disk_1T/sgiit/Pengming_Feng/GitClone/dota_detection/configs/ship_detection_net/dota_e2e_faster_rcnn_dconv_R_50_FPN_1x.yaml",
+    default="/home/sgiit/disk_1T/sgiit/Pengming_Feng/GitClone/dota_detection/configs/ship_detection_net/ship_detection_e2e_faster_rcnn_mdconv_R_50_FPN_1x_A64.yaml",
     metavar="FILE",
     help="path to config file",
 )
@@ -43,7 +43,7 @@ parser.add_argument("--local_rank", type=int, default=0)
 parser.add_argument(
     "--ckpt",
     help="The path to the checkpoint for test, default is the latest checkpoint.",
-    default='/home/sgiit/disk_2T/Train_Models/DOTA/dota_dconv_R_50_FPN_1x/model_0380000.pth',
+    default='/home/sgiit/disk_2T/Train_Models/HRSC/hrsc_mdconv_R_50_FPN_1x_weight_AL5_A64/model_best.pth',
 )
 parser.add_argument(
     "opts",

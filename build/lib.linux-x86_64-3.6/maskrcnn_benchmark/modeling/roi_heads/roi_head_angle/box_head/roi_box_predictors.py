@@ -18,8 +18,8 @@ class FPNPredictorWithAngle(nn.Module):
 
         nn.init.normal_(self.cls_score.weight, std=0.01)
         nn.init.normal_(self.bbox_pred.weight, std=0.001)
-        nn.init.normal_(self.bbox_pred.bbox_pred_lamda, std=0.001)
-        for l in [self.cls_score, self.bbox_pred]:
+        nn.init.normal_(self.bbox_pred_lamda.weight, std=0.001)
+        for l in [self.cls_score, self.bbox_pred, self.bbox_pred_lamda]:
             nn.init.constant_(l.bias, 0)
 
     def forward(self, x):

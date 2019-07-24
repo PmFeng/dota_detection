@@ -276,6 +276,57 @@ class FastRCNNLossComputation(object):
         return classification_loss, box_loss
     
     
+    def call_integrated_ratio(self, class_logits, box_regression):
+
+        class_logits = cat(class_logits, dim=0)
+        box_regression = cat(box_regression, dim=0)
+        device = class_logits.device
+
+        if not hasattr(self, "_proposals"):
+            raise RuntimeError("subsample needs to be called before")
+
+        proposals = self._proposals
+
+        labels = cat([proposal.get_field("labels") for proposal in proposals], dim=0)
+        regression_targets = cat(
+            [proposal.get_field("regression_targets") for proposal in proposals], dim=0
+        )
+
+        classification_loss = F.cross_entropy(class_logits, labels)
+
+        # get indices that correspond to the regression targets for
+        # the corresponding ground truth labels, to be used with
+        # advanced indexing
+        sampled_pos_inds_subset = torch.nonzero(labels > 0).squeeze(1)
+        labels_pos = labels[sampled_pos_inds_subset]
+        if self.cls_agnostic_bbox_reg:
+            map_inds = torch.tensor([5, 6, 7, 8, 9], device=device)
+        else:
+#            map_inds = 6 * labels_pos[:, None] + torch.tensor(
+#                [0, 1, 2, 3, 4, 5], device=device)
+            map_inds = 5 * labels_pos[:, None] + torch.tensor(
+                [0, 1, 2, 3, 4], device=device)
+
+        box_loss = smooth_l1_loss(
+            box_regression[sampled_pos_inds_subset[:, None], map_inds],
+            regression_targets[sampled_pos_inds_subset][:, :5],
+            size_average=False,
+            beta=1,
+        )
+        
+        box_regression_ratio = box_regression[sampled_pos_inds_subset[:, None], map_inds][:, 4] / regression_targets[sampled_pos_inds_subset][:, 6]
+        box_ratio_loss = smooth_l1_loss(
+            box_regression_ratio,
+            regression_targets[sampled_pos_inds_subset][:, 5],
+            size_average=False,
+            beta=1,
+        )
+        box_ratio_loss = box_ratio_loss / labels.numel()
+        box_loss = box_loss / labels.numel()
+
+        return classification_loss, box_loss, box_ratio_loss
+    
+    
     def __call__(self, class_logits, box_regression, lambda_integrated=None):
         """
         Computes the loss for Faster R-CNN.

@@ -42,6 +42,8 @@ def build_dataset(dataset_list, transforms, dataset_catalog, is_train=True):
             args["use_difficult"] = not is_train
         if data["factory"] == "HRSC_Dataset":
             args["use_difficult"] = not is_train
+        if data["factory"] == "DOTA_Dataset":
+            args["use_difficult"] = not is_train
         args["transforms"] = transforms
         # make dataset from factory
         dataset = factory(**args)

@@ -102,12 +102,31 @@ class DatasetCatalog(object):
         },
         "cityscapes_fine_instanceonly_seg_test_cocostyle": {
             "img_dir": "cityscapes/images",
-            "ann_file": "cityscapes/annotations/instancesonly_filtered_gtFine_test.json"
+            "ann_file": "cityscapes/annotations/instancesonly_filtered_gtFsine_test.json"
         },
         "hrsc":{
-            "split": "train",
+            "split": "train_without_overlap_and_empty",
             "img_dir": "/home/sgiit/disk_1T/sgiit/Pengming_Feng/Dataset/hrsc2016/HRSC2016/FullDataSet",
-            "ann_file": "/home/sgiit/disk_1T/sgiit/Pengming_Feng/Dataset/hrsc2016/HRSC2016/FullDataSet/Annotations_voc"}
+            "ann_file": "/home/sgiit/disk_1T/sgiit/Pengming_Feng/Dataset/hrsc2016/HRSC2016/FullDataSet/Annotations_voc"
+        },
+        "hrsc_val":{
+            "split": "val_fake",
+            "img_dir": "/home/sgiit/disk_1T/sgiit/Pengming_Feng/Dataset/hrsc2016/HRSC2016/FullDataSet",
+            "ann_file": "/home/sgiit/disk_1T/sgiit/Pengming_Feng/Dataset/hrsc2016/HRSC2016/FullDataSet/Annotations_voc"
+        },
+        "zkxt_val":{
+            "split": "testval",
+            "img_dir": "/home/sgiit/disk_1T/sgiit/Pengming_Feng/Dataset/hrsc2016/HRSC2016/FullDataSet",
+            "ann_file": "/home/sgiit/disk_1T/sgiit/Pengming_Feng/Dataset/hrsc2016/HRSC2016/FullDataSet/Annotations_voc"
+        },
+        "dota":{
+            "split": "train",
+            "img_dir": "/home/sgiit/disk_2T/DataSet/rssrai2019_object_detection/data_split_800/train",
+        },
+        "dota_val":{
+            "split": "val",
+            "img_dir": "/home/sgiit/disk_2T/DataSet/rssrai2019_object_detection/data_split/val",
+        }
     }
 
     @staticmethod
@@ -143,6 +162,17 @@ class DatasetCatalog(object):
             )
             return dict(
                 factory="HRSC_Dataset",
+                args=args,
+            )
+        elif "dota" in name:
+            data_dir = DatasetCatalog.DATA_DIR
+            attrs = DatasetCatalog.DATASETS[name]
+            args = dict(
+                data_dir=os.path.join(data_dir, attrs["img_dir"]),
+                split=attrs["split"],
+            )
+            return dict(
+                factory="DOTA_Dataset",
                 args=args,
             )
         raise RuntimeError("Dataset not available: {}".format(name))

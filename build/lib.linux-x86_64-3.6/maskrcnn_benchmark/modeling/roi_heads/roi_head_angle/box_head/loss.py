@@ -3,6 +3,7 @@ import torch
 from torch.nn import functional as F
 
 from maskrcnn_benchmark.layers import smooth_l1_loss
+#from maskrcnn_benchmark.modeling.box_coder_with_constrained_and_diff_angle import BoxCoder
 from maskrcnn_benchmark.modeling.box_coder_with_angle import BoxCoder
 from maskrcnn_benchmark.modeling.matcher import Matcher
 from maskrcnn_benchmark.structures.boxlist_ops import boxlist_iou
@@ -23,7 +24,8 @@ class FastRCNNLossComputation(object):
         proposal_matcher,
         fg_bg_sampler,
         box_coder,
-        cls_agnostic_bbox_reg=False
+        cls_agnostic_bbox_reg=False,
+        lambda_integrated=True,
     ):
         """
         Arguments:
@@ -53,6 +55,7 @@ class FastRCNNLossComputation(object):
         labels = []
         regression_targets = []
         for proposals_per_image, targets_per_image in zip(proposals, targets):
+            target_size = len(targets_per_image)
             matched_targets = self.match_targets_to_proposals(
                 proposals_per_image, targets_per_image
             )
@@ -72,6 +75,8 @@ class FastRCNNLossComputation(object):
             # compute regression targets
             #ex_theta = matched_targets.get_field('theta')
             gt_theta = matched_targets.get_field('theta')
+            for tl in range(1, target_size+1):
+                gt_theta[-tl] = 0
             
             regression_targets_per_image = self.box_coder.encode(
                 matched_targets.bbox, proposals_per_image.bbox, gt_theta
@@ -85,7 +90,9 @@ class FastRCNNLossComputation(object):
     def prepare_targets_no_integrated(self, proposals, targets):
         labels = []
         regression_targets = []
+        regression_angles = []
         for proposals_per_image, targets_per_image in zip(proposals, targets):
+            target_size = len(targets_per_image)
             matched_targets = self.match_targets_to_proposals(
                 proposals_per_image, targets_per_image
             )
@@ -103,16 +110,23 @@ class FastRCNNLossComputation(object):
             labels_per_image[ignore_inds] = -1  # -1 is ignored by sampler
 
             # compute regression targets
-            regression_targets_per_image = self.box_coder.encode(
-                matched_targets.bbox, proposals_per_image.bbox
+            #ex_theta = matched_targets.get_field('theta')
+            gt_theta = matched_targets.get_field('theta')
+            for tl in range(1, target_size+1):
+                gt_theta[-tl] = 0
+            
+            # compute regression targets
+            regression_targets_per_image,  regression_angle_per_image = self.box_coder.encode(
+                matched_targets.bbox, proposals_per_image.bbox, gt_theta
             )
 
             labels.append(labels_per_image)
             regression_targets.append(regression_targets_per_image)
+            regression_angles.append(regression_angle_per_image)
 
-        return labels, regression_targets
+        return labels, regression_targets, regression_angles
 
-    def subsample(self, proposals, targets):
+    def subsample(self, proposals, targets, lambda_integrated):
         """
         This method performs the positive/negative sampling, and return
         the sampled proposals.
@@ -122,20 +136,36 @@ class FastRCNNLossComputation(object):
             proposals (list[BoxList])
             targets (list[BoxList])
         """
-
-        labels, regression_targets = self.prepare_targets(proposals, targets)
+        if lambda_integrated:
+            labels, regression_targets = self.prepare_targets(proposals, 
+                                                              targets)
+        else:
+            labels, regression_targets, regression_angles = self.prepare_targets_no_integrated(proposals, 
+                                                                            targets)
+            
         sampled_pos_inds, sampled_neg_inds = self.fg_bg_sampler(labels)
 
         proposals = list(proposals)
         # add corresponding label and regression_targets information to the bounding boxes
-        for labels_per_image, regression_targets_per_image, proposals_per_image in zip(
-            labels, regression_targets, proposals
-        ):
-            proposals_per_image.add_field("labels", labels_per_image)
-            proposals_per_image.add_field(
-                "regression_targets", regression_targets_per_image
-            )
-
+        if lambda_integrated:
+            for labels_per_image, regression_targets_per_image, proposals_per_image in zip(
+                labels, regression_targets, proposals
+            ):
+                proposals_per_image.add_field("labels", labels_per_image)
+                proposals_per_image.add_field(
+                    "regression_targets", regression_targets_per_image
+                )
+        else:
+            for labels_per_image, regression_targets_per_image, regression_angles_per_image, proposals_per_image in zip(
+                labels, regression_targets, regression_angles, proposals
+            ):
+                proposals_per_image.add_field("labels", labels_per_image)
+                proposals_per_image.add_field(
+                    "regression_targets", regression_targets_per_image
+                )
+                proposals_per_image.add_field(
+                    "regression_angles", regression_angles_per_image
+                )
         # distributed sampled proposals, that were obtained on all feature maps
         # concatenated via the fg_bg_sampler, into individual feature map levels
         for img_idx, (pos_inds_img, neg_inds_img) in enumerate(
@@ -148,11 +178,12 @@ class FastRCNNLossComputation(object):
         self._proposals = proposals
         return proposals
 
-    def call_no_integrated(self, class_logits, box_regression):
+    def call_no_integrated(self, class_logits, box_regression, lambda_regression):
 
 
         class_logits = cat(class_logits, dim=0)
         box_regression = cat(box_regression, dim=0)
+        lambda_regression = cat(lambda_regression, dim=0)
         device = class_logits.device
 
         if not hasattr(self, "_proposals"):
@@ -163,6 +194,9 @@ class FastRCNNLossComputation(object):
         labels = cat([proposal.get_field("labels") for proposal in proposals], dim=0)
         regression_targets = cat(
             [proposal.get_field("regression_targets") for proposal in proposals], dim=0
+        )
+        regression_angles = cat(
+            [proposal.get_field("regression_angles") for proposal in proposals], dim=0
         )
 
         classification_loss = F.cross_entropy(class_logits, labels)
@@ -177,6 +211,7 @@ class FastRCNNLossComputation(object):
         else:
             map_inds = 4 * labels_pos[:, None] + torch.tensor(
                 [0, 1, 2, 3], device=device)
+            lambda_map_inds = labels_pos[:, None] 
 
         box_loss = smooth_l1_loss(
             box_regression[sampled_pos_inds_subset[:, None], map_inds],
@@ -185,8 +220,16 @@ class FastRCNNLossComputation(object):
             beta=1,
         )
         box_loss = box_loss / labels.numel()
+        
+        ang_loss = smooth_l1_loss(
+            lambda_regression[sampled_pos_inds_subset[:, None], lambda_map_inds],
+            regression_angles[sampled_pos_inds_subset, None],
+            size_average=False,
+            beta=1,
+        )
+        ang_loss = ang_loss / labels.numel()
 
-        return classification_loss, box_loss
+        return classification_loss, box_loss, ang_loss
  
     
     
@@ -217,6 +260,8 @@ class FastRCNNLossComputation(object):
         if self.cls_agnostic_bbox_reg:
             map_inds = torch.tensor([5, 6, 7, 8, 9], device=device)
         else:
+#            map_inds = 6 * labels_pos[:, None] + torch.tensor(
+#                [0, 1, 2, 3, 4, 5], device=device)
             map_inds = 5 * labels_pos[:, None] + torch.tensor(
                 [0, 1, 2, 3, 4], device=device)
 
@@ -229,6 +274,57 @@ class FastRCNNLossComputation(object):
         box_loss = box_loss / labels.numel()
 
         return classification_loss, box_loss
+    
+    
+    def call_integrated_ratio(self, class_logits, box_regression):
+
+        class_logits = cat(class_logits, dim=0)
+        box_regression = cat(box_regression, dim=0)
+        device = class_logits.device
+
+        if not hasattr(self, "_proposals"):
+            raise RuntimeError("subsample needs to be called before")
+
+        proposals = self._proposals
+
+        labels = cat([proposal.get_field("labels") for proposal in proposals], dim=0)
+        regression_targets = cat(
+            [proposal.get_field("regression_targets") for proposal in proposals], dim=0
+        )
+
+        classification_loss = F.cross_entropy(class_logits, labels)
+
+        # get indices that correspond to the regression targets for
+        # the corresponding ground truth labels, to be used with
+        # advanced indexing
+        sampled_pos_inds_subset = torch.nonzero(labels > 0).squeeze(1)
+        labels_pos = labels[sampled_pos_inds_subset]
+        if self.cls_agnostic_bbox_reg:
+            map_inds = torch.tensor([5, 6, 7, 8, 9], device=device)
+        else:
+#            map_inds = 6 * labels_pos[:, None] + torch.tensor(
+#                [0, 1, 2, 3, 4, 5], device=device)
+            map_inds = 5 * labels_pos[:, None] + torch.tensor(
+                [0, 1, 2, 3, 4], device=device)
+
+        box_loss = smooth_l1_loss(
+            box_regression[sampled_pos_inds_subset[:, None], map_inds],
+            regression_targets[sampled_pos_inds_subset][:, :5],
+            size_average=False,
+            beta=1,
+        )
+        
+        box_regression_ratio = box_regression[sampled_pos_inds_subset[:, None], map_inds][:, 4] / regression_targets[sampled_pos_inds_subset][:, 6]
+        box_ratio_loss = smooth_l1_loss(
+            box_regression_ratio,
+            regression_targets[sampled_pos_inds_subset][:, 5],
+            size_average=False,
+            beta=1,
+        )
+        box_ratio_loss = box_ratio_loss / labels.numel()
+        box_loss = box_loss / labels.numel()
+
+        return classification_loss, box_loss, box_ratio_loss
     
     
     def __call__(self, class_logits, box_regression, lambda_integrated=None):
@@ -245,18 +341,13 @@ class FastRCNNLossComputation(object):
             box_loss (Tensor)
         """
         
-        if lambda_integrated:
-            classification_loss, box_loss = self.call_integrated(class_logits, 
-                                                            box_regression)
+        if lambda_integrated is None:
+            return self.call_integrated(class_logits, 
+                                        box_regression)
         else:
-            classification_loss, box_loss = self.call_no_integrated(class_logits, 
-                                                               box_regression, 
-                                                               lambda_integrated)
-
-        return classification_loss, box_loss
-    
-    
-    
+            return self.call_no_integrated(class_logits, 
+                                           box_regression, 
+                                           lambda_integrated)
     
     
     
