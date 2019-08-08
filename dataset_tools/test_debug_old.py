@@ -35,7 +35,7 @@ except ImportError:
 parser = argparse.ArgumentParser(description="PyTorch Object Detection Inference")
 parser.add_argument(
     "--config-file",
-    default="/home/sgiit/disk_2T/Train_Models/DOTA/dota_dconv_R_50_FPN_1x_weight_AL5/config.yml",
+    default="/home/sgiit/disk_1T/sgiit/Pengming_Feng/GitClone/dota_detection/configs/ship_detection_net/ship_detection_e2e_faster_rcnn_dconv_constrained_R_50_FPN_1x.yaml",
     metavar="FILE",
     help="path to config file",
 )
@@ -43,7 +43,7 @@ parser.add_argument("--local_rank", type=int, default=0)
 parser.add_argument(
     "--ckpt",
     help="The path to the checkpoint for test, default is the latest checkpoint.",
-    default='/home/sgiit/disk_2T/Train_Models/DOTA/dota_dconv_R_50_FPN_1x_weight_AL5/model_0752500.pth',
+    default='/home/sgiit/disk_2T/Train_Models/HRSC/hrsc_dconv_constrained_rotation_hw_R_50_FPN_1x_weight_AL10_AR_added_th_10/model_best.pth',
 )
 parser.add_argument(
     "opts",
@@ -250,44 +250,6 @@ def hrbb_anchor2obb_anchor(proposal, angle):
     hrbb_x_max = [proposal[0] + proposal[2]/2]
     hrbb_y_max = [proposal[1] + proposal[3]/2]   
     
-#    if angle < 0:
-#        angle = 90 + angle
-#        h = (proposal[3] - np.tan(angle/180*np.pi)*proposal[2])/(1-(np.tan(angle/180*np.pi))**2)
-#        w = h * np.tan(angle/180*np.pi)
-#        if h > proposal[3] or w > proposal[2]:
-#            h = (proposal[3] - np.tan((90-angle)/180*np.pi)*proposal[2])/(1-(np.tan((90-angle)/180*np.pi))**2)
-#            w = h * np.tan(angle/180*np.pi)
-#        if h < 0:
-#            h = proposal[3]+h
-#        if w < 0:
-#            w = proposal[2]+w
-##        h = abs(h)
-##        if h > proposal[3]:
-##            h = h-proposal[3]
-##        w = h * np.tan(angle/180*np.pi)
-##        w = abs(w)
-#        obb_pt_1 = np.array([hrbb_x_min, hrbb_y_min + h])
-#        obb_pt_2 = np.array([hrbb_x_min + w, hrbb_y_min])
-#        obb_pt_3 = np.array([hrbb_x_max, hrbb_y_max - h])
-#        obb_pt_4 = np.array([hrbb_x_max - w, hrbb_y_max])
-#    else:
-#        angle = 90 - angle
-#        h = (proposal[3] - np.tan(angle/180*np.pi)*proposal[2])/(1-(np.tan(angle/180*np.pi))**2)
-#        w = h * np.tan(angle/180*np.pi)
-#        if h < 0:
-#            h = proposal[3]+h
-#        if w < 0:
-#            w = proposal[2]+w
-#        obb_pt_1 = np.array([hrbb_x_min, hrbb_y_max - h])
-#        obb_pt_2 = np.array([hrbb_x_max - w, hrbb_y_min])
-#        obb_pt_3 = np.array([hrbb_x_max, hrbb_y_min + h])
-#        obb_pt_4 = np.array([hrbb_x_min + w, hrbb_y_max])
-
-
-###################################################
-
-
-
     if angle < 0:
         angle = 90 + angle
         h = (proposal[3] - np.tan(angle/180*np.pi)*proposal[2])/(1-(np.tan(angle/180*np.pi))**2)
@@ -320,8 +282,7 @@ def hrbb_anchor2obb_anchor(proposal, angle):
         obb_pt_2 = np.array([hrbb_x_max - w, hrbb_y_min])
         obb_pt_3 = np.array([hrbb_x_max, hrbb_y_min + h])
         obb_pt_4 = np.array([hrbb_x_min + w, hrbb_y_max])
-        
-######################################################################################################
+
     
     obb_bbox = np.array([
             obb_pt_1,
@@ -332,7 +293,7 @@ def hrbb_anchor2obb_anchor(proposal, angle):
     
     
     
-    return obb_bbox#, h, w
+    return obb_bbox, h, w
 
 
 
@@ -366,29 +327,18 @@ while i < size_data:
                 big_box[2]-big_box[0],
                 big_box[3]-big_box[1],
                 ]
-        # --------- GT obb bbox -----------
         cv.drawContours(img,[box],0,(0,255,255),2)
-        
         label = "d:{:.1f}".format(angle)
-        
-        cv.putText(img, label, (rc_box[0], rc_box[1] - 2), 0, 0.5, [225, 255, 255], 2)
-        # --------- GT hbb bbox -----------
-#        cv.rectangle(img, (big_box[0], big_box[1]), (big_box[2], big_box[3]), (255,255,0), 2)
+#        cv.putText(img, label, (rc_box[0], rc_box[1] - 2), 0, 0.5, [225, 255, 255], 2)
+#        cv.rectangle(img, (big_box[0], big_box[1]), (big_box[2], big_box[3]), (0,255,0), 2)
 #        box_recover = hrbb_anchor2obb_anchor(big_box_xywh, angle)
-        # --------- GT recover obb bbox -----------
-#        cv.drawContours(img,[box_recover],0,(0,255,0),2)
+#        cv.drawContours(img,[box_recover],0,(0,255,255),2)
         
-        # --------- GT real hbb bbox -----------
         #cv.rectangle(img, (rc_box[0], rc_box[1]), (rc_box[2], rc_box[3]), (0,255,0), 2)
-        
-        # --------- GT obb bbox with no angle -----------
         #cv.rectangle(img, (rc_tota[0], rc_tota[1]), (rc_tota[2], rc_tota[3]), (255,0,0), 2)
         
     #    cv.polylines(img,[box],True,(0,0,255),2)
         #cv.polylines(img,[pts], True, (0,0,255), thickness = 5)
-        
-        
-# --------- Predict bbox -----------
     bboxeslist = pred_boxlists[i]
     thetas = bboxeslist.get_field('theta').numpy()
     bboxes = bboxeslist.bbox
@@ -401,18 +351,15 @@ while i < size_data:
                 bbox[2]-bbox[0],
                 bbox[3]-bbox[1],
                 ]
-        box_recover= hrbb_anchor2obb_anchor(box_xywh, theta)
+        box_recover, h, w = hrbb_anchor2obb_anchor(box_xywh, theta)
         print(box_recover.shape)
-        # --------- Predict obb bbox -----------
         cv.drawContours(img,[box_recover],0,(0,0,255),2)
-#        label = "pd:{:.1f},h:{:.1f},w:{:.1f}".format(theta, h, w)
-        label = "pd:{:.1f}".format(theta)
-        cv.putText(img, label, (bbox[0], bbox[3] + 30), 0, 0.5, [225, 0, 255], 2)
+        label = "pd:{:.1f},h:{:.1f},w:{:.1f}".format(theta, h, w)
+#        cv.putText(img, label, (bbox[0], bbox[3] + 30), 0, 0.5, [225, 0, 255], 2)
         label = "H:{},W:{}".format(box_xywh[3], box_xywh[2])
-        cv.putText(img, label, (bbox[0] + box_xywh[2]//2, bbox[1] - 5), 0, 0.5, [225, 255, 255], 2)
-        # --------- Predict hbb bbox -----------
-        cv.rectangle(img, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (255,0,0), 2)
-        
+#        cv.putText(img, label, (bbox[0]+ box_xywh[2]//2, bbox[1] - 5), 0, 0.5, [225, 255, 255], 2)
+#        cv.rectangle(img, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (255,255,0), 2)
+    
     
     
     cv.imshow('image: {}'.format(i),img)
@@ -430,57 +377,3 @@ while i < size_data:
         break
     
 cv.destroyAllWindows() 
-
-
-
-# ------------ txt results -------------
-class_file = []
-for label in CLASSES:
-    if label != "__background__ ":
-        f = open('results/' + label + '.txt', 'w')
-        class_file.append(f)
-        
-    
-for i, pred in enumerate(pred_boxlists):
-    img_id = dataset.ids[i]
-    if pred.bbox.size(0) == 0:
-        continue
-    else:
-        for idx, bb in enumerate(pred.bbox):
-            th = pred.get_field('theta').numpy()[idx]
-            lb = pred.get_field('labels')[idx]
-            sc = pred.get_field('scores')[idx]
-            
-            bb = np.array(bb.numpy(), dtype=np.int64)
-        
-#            box_xywh = [
-#                    (bb[0]+bb[2]) // 2, 
-#                    (bb[1]+bb[3]) // 2,
-#                    bb[2]-bb[0],
-#                    bb[3]-bb[1],
-#                    ]
-#            bb= hrbb_anchor2obb_anchor(box_xywh, th)
-            
-            class_file[lb - 1].write(img_id)
-            class_file[lb - 1].write(" ")
-            class_file[lb - 1].write(str(sc.item()))
-            class_file[lb - 1].write(" ")
-            class_file[lb - 1].write(str(int(bb[0])))
-            class_file[lb - 1].write(" ")
-            class_file[lb - 1].write(str(int(bb[1])))
-            class_file[lb - 1].write(" ")
-            class_file[lb - 1].write(str(int(bb[2])))
-            class_file[lb - 1].write(" ")
-            class_file[lb - 1].write(str(int(bb[1])))
-            class_file[lb - 1].write(" ")
-            class_file[lb - 1].write(str(int(bb[2])))
-            class_file[lb - 1].write(" ")
-            class_file[lb - 1].write(str(int(bb[3])))
-            class_file[lb - 1].write(" ")
-            class_file[lb - 1].write(str(int(bb[0])))
-            class_file[lb - 1].write(" ")
-            class_file[lb - 1].write(str(int(bb[3])))
-            class_file[lb - 1].write("\n")
-            
-for f in class_file:
-    f.close()

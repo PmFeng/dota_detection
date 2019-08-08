@@ -3,7 +3,10 @@ import torch
 from torch.nn import functional as F
 
 from maskrcnn_benchmark.layers import smooth_l1_loss
-from maskrcnn_benchmark.modeling.box_coder import BoxCoder
+#from maskrcnn_benchmark.modeling.box_coder import BoxCoder
+
+from maskrcnn_benchmark.modeling.box_coder_with_constrained_rotation_hw_angle import BoxCoder
+
 from maskrcnn_benchmark.modeling.matcher import Matcher
 from maskrcnn_benchmark.structures.boxlist_ops import boxlist_iou
 from maskrcnn_benchmark.modeling.balanced_positive_negative_sampler import (

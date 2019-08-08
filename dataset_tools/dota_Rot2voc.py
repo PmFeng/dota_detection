@@ -15,10 +15,15 @@ import xml.etree.ElementTree as ET
 import glob
 from PIL import Image
 
-path = '/home/sgiit/disk_2T/DataSet/rssrai2019_object_detection/data_split/val/labelTxt'
-out_path = '/home/sgiit/disk_2T/DataSet/rssrai2019_object_detection/data_split/val/labelTxt_Rot/'
+path = '/home/sgiit/disk_2T/DataSet/rssrai2019_object_detection/origin_data/test_800/labelTxt'
+out_path = '/home/sgiit/disk_2T/DataSet/rssrai2019_object_detection/origin_data/test_800/labelTxt_Rot/'
 out_xml_path = '/home/sgiit/disk_2T/DataSet/rssrai2019_object_detection/data_split/val/labelxml_voc_4point/'
-img_path = '/home/sgiit/disk_2T/DataSet/rssrai2019_object_detection/data_split/val/images/'
+img_path = '/home/sgiit/disk_2T/DataSet/rssrai2019_object_detection/origin_data/test_800/images/'
+
+#path = '/home/sgiit/disk_2T/DataSet/rssrai2019_object_detection/data_split/val/labelTxt'
+#out_path = '/home/sgiit/disk_2T/DataSet/rssrai2019_object_detection/data_split/val/labelTxt_Rot'
+#out_xml_path = '/home/sgiit/disk_2T/DataSet/rssrai2019_object_detection/data_split/val/labelxml_voc_4point/'
+#img_path = '/home/sgiit/disk_2T/DataSet/rssrai2019_object_detection/data_split/val/images/'
 
 file_list  = glob.glob(path + '/*.txt')
 
@@ -144,6 +149,7 @@ for file in tqdm(file_list):
             ET.SubElement(bx, 'center_y').text = str(center_y)
             ET.SubElement(bx, 'box_width').text = str(box_width)
             ET.SubElement(bx, 'box_height').text = str(box_height)
+            ET.SubElement(bx, 'box_ang').text = str(box_ang)
             
             ET.SubElement(bx, 'x1').text = str(x1)
             ET.SubElement(bx, 'y1').text = str(y1)
@@ -157,7 +163,7 @@ for file in tqdm(file_list):
             
         xml_file = file_name + '.xml'
         tree = ET.ElementTree(root)
-        tree.write(out_xml_path+xml_file)
+        tree.write(out_path+xml_file)
         f.close()    
             
     

@@ -1,10 +1,11 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 import torch
 from torch.nn import functional as F
+import torch.nn as nn
 
 from maskrcnn_benchmark.layers import smooth_l1_loss
 #from maskrcnn_benchmark.modeling.box_coder_with_constrained_and_diff_angle import BoxCoder
-from maskrcnn_benchmark.modeling.box_coder_with_angle import BoxCoder
+from maskrcnn_benchmark.modeling.box_coder_with_only_hw import BoxCoder
 from maskrcnn_benchmark.modeling.matcher import Matcher
 from maskrcnn_benchmark.structures.boxlist_ops import boxlist_iou
 from maskrcnn_benchmark.modeling.balanced_positive_negative_sampler import (
@@ -42,7 +43,7 @@ class FastRCNNLossComputation(object):
         match_quality_matrix = boxlist_iou(target, proposal)
         matched_idxs = self.proposal_matcher(match_quality_matrix)
         # Fast RCNN only need "labels" field for selecting the targets
-        target = target.copy_with_fields(["labels", "theta", "obb_boxes"])
+        target = target.copy_with_fields(["labels", "theta", "obb_boxes","pt_inbox"])
         # get the targets corresponding GT for each proposal
         # NB: need to clamp the indices because we can have a single
         # GT in the image, and matched_idxs can be -2, which goes
@@ -74,12 +75,13 @@ class FastRCNNLossComputation(object):
 
             # compute regression targets
             #ex_theta = matched_targets.get_field('theta')
-            gt_theta = matched_targets.get_field('theta')
-            for tl in range(1, target_size+1):
-                gt_theta[-tl] = 0
+            #gt_theta = matched_targets.get_field('theta')
+            gt_pt_hw = matched_targets.get_field('pt_inbox')
+#            for tl in range(1, target_size+1):
+#                gt_theta[-tl] = 0
             
             regression_targets_per_image = self.box_coder.encode(
-                matched_targets.bbox, proposals_per_image.bbox, gt_theta
+                matched_targets.bbox, proposals_per_image.bbox, gt_pt_hw.bbox
             )
 
             labels.append(labels_per_image)
@@ -262,8 +264,10 @@ class FastRCNNLossComputation(object):
         else:
 #            map_inds = 6 * labels_pos[:, None] + torch.tensor(
 #                [0, 1, 2, 3, 4, 5], device=device)
-            map_inds = 5 * labels_pos[:, None] + torch.tensor(
-                [0, 1, 2, 3, 4], device=device)
+            map_inds = 6 * labels_pos[:, None] + torch.tensor(
+                [0, 1, 2, 3, 4, 5], device=device)
+            
+#        box_loss_ = box_regression[sampled_pos_inds_subset[:, None], map_inds] - regression_targets[sampled_pos_inds_subset]
 
         box_loss = smooth_l1_loss(
             box_regression[sampled_pos_inds_subset[:, None], map_inds],
@@ -271,6 +275,14 @@ class FastRCNNLossComputation(object):
             size_average=False,
             beta=1,
         )
+#        print(box_loss_)
+#        print(type(box_loss_))
+        
+#        loss_box = nn.L1Loss()
+#        
+#        box_loss = loss_box(box_regression[sampled_pos_inds_subset[:, None], map_inds],
+#                            regression_targets[sampled_pos_inds_subset])  
+        
         box_loss = box_loss / labels.numel()
 
         return classification_loss, box_loss
@@ -309,22 +321,22 @@ class FastRCNNLossComputation(object):
 
         box_loss = smooth_l1_loss(
             box_regression[sampled_pos_inds_subset[:, None], map_inds],
-            regression_targets[sampled_pos_inds_subset][:, :5],
+            regression_targets[sampled_pos_inds_subset],
             size_average=False,
             beta=1,
         )
-        
-        box_regression_ratio = box_regression[sampled_pos_inds_subset[:, None], map_inds][:, 4] / regression_targets[sampled_pos_inds_subset][:, 6]
-        box_ratio_loss = smooth_l1_loss(
-            box_regression_ratio,
-            regression_targets[sampled_pos_inds_subset][:, 5],
-            size_average=False,
-            beta=1,
-        )
-        box_ratio_loss = box_ratio_loss / labels.numel()
+#        
+#        box_regression_ratio = box_regression[sampled_pos_inds_subset[:, None], map_inds][:, 4] / regression_targets[sampled_pos_inds_subset][:, 6]
+#        box_ratio_loss = smooth_l1_loss(
+#            box_regression_ratio,
+#            regression_targets[sampled_pos_inds_subset][:, 5],
+#            size_average=False,
+#            beta=1,
+#        )
+#        box_ratio_loss = box_ratio_loss / labels.numel()
         box_loss = box_loss / labels.numel()
 
-        return classification_loss, box_loss, box_ratio_loss
+        return classification_loss, box_loss
     
     
     def __call__(self, class_logits, box_regression, lambda_integrated=None):

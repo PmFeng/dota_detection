@@ -147,7 +147,7 @@ def main():
     parser.add_argument(
         "--config-file",
         #default="/home/sgiit/disk_1T/sgiit/Pengming_Feng/GitClone/ship_detection_optical/configs/e2e_faster_rcnn_R_50_FPN_1x.yaml",
-        default="/home/sgiit/disk_1T/sgiit/Pengming_Feng/GitClone/dota_detection/configs/ship_detection_net/ship_detection_e2e_faster_rcnn_mdconv_R_50_Retina_1x_A64.yaml",
+        default="/home/sgiit/disk_1T/sgiit/Pengming_Feng/GitClone/dota_detection/configs/ship_detection_net/dota_e2e_faster_rcnn_dconv_R_50_FPN_1x.yaml",
         metavar="FILE",
         help="path to config file",
         type=str,

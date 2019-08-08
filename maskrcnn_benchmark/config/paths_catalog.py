@@ -114,18 +114,22 @@ class DatasetCatalog(object):
             "img_dir": "/home/sgiit/disk_1T/sgiit/Pengming_Feng/Dataset/hrsc2016/HRSC2016/FullDataSet",
             "ann_file": "/home/sgiit/disk_1T/sgiit/Pengming_Feng/Dataset/hrsc2016/HRSC2016/FullDataSet/Annotations_voc"
         },
-        "zkxt_val":{
-            "split": "testval",
+        "hrsc_testval":{
+            "split": "val",
             "img_dir": "/home/sgiit/disk_1T/sgiit/Pengming_Feng/Dataset/hrsc2016/HRSC2016/FullDataSet",
             "ann_file": "/home/sgiit/disk_1T/sgiit/Pengming_Feng/Dataset/hrsc2016/HRSC2016/FullDataSet/Annotations_voc"
         },
         "dota":{
             "split": "train",
-            "img_dir": "/home/sgiit/disk_2T/DataSet/rssrai2019_object_detection/data_split_800/train",
+            "img_dir": "/home/sgiit/disk_2T/DataSet/datasets/rssrai2019_object_detection/data_split_800/train",
         },
         "dota_val":{
             "split": "val",
-            "img_dir": "/home/sgiit/disk_2T/DataSet/rssrai2019_object_detection/data_split/val",
+            "img_dir": "/home/sgiit/disk_2T/DataSet/datasets/rssrai2019_object_detection/data_split_800/val",
+        },
+        "dota_test":{
+            "split": "test",
+            "img_dir": "/home/sgiit/disk_2T/DataSet/rssrai2019_object_detection/origin_data/test_800"
         }
     }
 

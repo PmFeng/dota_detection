@@ -84,6 +84,32 @@ def hrbb_anchor2obb_anchor_0_180(proposal, angle):
     
     return obb_bbox#, h, w
 
+
+def hrbb_anchor2hw_obb(proposal, hw):
+    hrbb_x_min = [proposal[0] - proposal[2]/2]
+    hrbb_y_min = [proposal[1] - proposal[3]/2]
+    hrbb_x_max = [proposal[0] + proposal[2]/2]
+    hrbb_y_max = [proposal[1] + proposal[3]/2]   
+
+    h = hw[0]
+    w = hw[1]  
+    h2 = proposal[3] - h
+    w2 = proposal[2] - w
+    
+    obb_pt_1 = np.array([hrbb_x_min + w, hrbb_y_min])
+    obb_pt_2 = np.array([hrbb_x_max, hrbb_y_min + h2])
+    obb_pt_3 = np.array([hrbb_x_min + w2, hrbb_y_max])
+    obb_pt_4 = np.array([hrbb_x_min, hrbb_y_min + h])
+    
+    obb_bbox = np.array([
+            obb_pt_1,
+            obb_pt_2,
+            obb_pt_3,
+            obb_pt_4
+        ], dtype=np.int64)
+    
+    return obb_bbox
+
 def hrbb_anchor2obb_anchor(proposal, angle):
     
     hrbb_x_min = [proposal[0] - proposal[2]/2]
@@ -227,9 +253,10 @@ class DOTA_Dataset(torch.utils.data.Dataset):
 #        return target
         
         height, width = anno["im_info"]
-        target = BoxList(anno["hrbb_boxes"], (width, height), mode="xyxy")        
+        target = BoxList(anno["hrbb_boxes"], (width, height), mode="xyxy") 
         obb_target = BoxList(anno["obb_boxes"], (width, height), mode="xywh")
-        target.add_field("obb_boxes", obb_target)   
+        target.add_field("obb_boxes", obb_target)
+        target.add_field("pt_inbox", anno["pt_inbox"]) 
         target.add_field("labels", anno["labels"])
         target.add_field("difficult", anno["difficult"])
         target.add_field("theta", anno["theta"])
@@ -248,7 +275,9 @@ class DOTA_Dataset(torch.utils.data.Dataset):
         #boxes = []
         obb_boxes = []
         hbb_boxes = []
+        hrbb_boxes = []
         gt_classes = []
+        pt_inboxs = []
         difficult_boxes = []
         thetas = []
         TO_REMOVE = 1
@@ -279,11 +308,16 @@ class DOTA_Dataset(torch.utils.data.Dataset):
             
             theta = float(bb.find("box_ang").text)
             
+            theta = math.degrees(theta)
             
+            if theta > 90.0:
+                theta -= 180
+            elif theta < -90.0:
+                theta += 180
             
             hbb_box = ((OBB_box[0], OBB_box[1]),
                        (OBB_box[2], OBB_box[3]),
-                       math.degrees(theta))
+                       theta)
             hbb_box = cv.boxPoints(hbb_box)
             hbb_box = np.int0(hbb_box)
             
@@ -291,8 +325,6 @@ class DOTA_Dataset(torch.utils.data.Dataset):
             pt_x_y_max = hbb_box.max(axis= 0)
             
             hrbb_box = np.hstack((pt_x_y_min, pt_x_y_max))
-            
-
             
             hrbb_bndbox = tuple(
                 map(lambda x: x - TO_REMOVE, list(map(int, hrbb_box)))
@@ -306,32 +338,26 @@ class DOTA_Dataset(torch.utils.data.Dataset):
                           OBB_box[2], OBB_box[3]]
             
             
+ 
+            pt_h = hbb_box[3][1] - hrbb_box[1]
+            pt_w = hbb_box[0][0] - hrbb_box[0]
+            pt_inbox = [pt_h, pt_w]
             
-            
-            theta = float(bb.find("box_ang").text)
-            
-            theta = math.degrees(theta)
-            
-            if theta > 90.0:
-                theta -= 180
-                if theta > -46 and theta < -44:
-                    theta = -42
-            elif theta < -90.0:
-                theta += 180
-                if theta < 46 and theta > 44:
-                    theta = 48
-            elif theta == -90.0:
-                theta = 90
-            elif theta < 46 and theta > 44:
-                    theta = 48
-            elif theta > -46 and theta < -44:
-                    theta = -42
+            if theta < 0:
+                pt_h = hbb_box[1][1] - hrbb_box[1]
+                pt_w = hbb_box[2][0] - hrbb_box[0]
+                pt_inbox = [pt_h, pt_w]
+            else:
+                pt_h = hbb_box[0][1] - hrbb_box[1]
+                pt_w = hbb_box[1][0] - hrbb_box[0]
+                pt_inbox = [pt_h, pt_w]
             
             thetas.append(theta)
             
-            
+            pt_inboxs.append(pt_inbox)
             obb_boxes.append(obb_bndbox)
-            hbb_boxes.append(hrbb_bndbox)
+            hbb_boxes.append(hbb_box)
+            hrbb_boxes.append(hrbb_bndbox)
             #gt_classes.append(self.class_to_ind[name])
             gt_classes.append(self.class_to_ind[name])
             difficult_boxes.append(difficult)
@@ -341,8 +367,10 @@ class DOTA_Dataset(torch.utils.data.Dataset):
         im_info = tuple(map(int, (size.find("height").text, size.find("width").text)))
 
         res = {
+            "pt_inbox": torch.tensor(pt_inboxs, dtype=torch.float32),
             "obb_boxes": torch.tensor(obb_boxes, dtype=torch.float32),
-            "hrbb_boxes": torch.tensor(hbb_boxes, dtype=torch.float32),
+            "hbb_boxes": torch.tensor(hbb_boxes, dtype=torch.float32),
+            "hrbb_boxes": torch.tensor(hrbb_boxes, dtype=torch.float32),
             "labels": torch.tensor(gt_classes),
             "difficult": torch.tensor(difficult_boxes),
             "theta": torch.tensor(thetas, dtype=torch.float32),
@@ -387,13 +415,14 @@ while i < size_data:
     img, label, idd = dataset.__getitem__(i)
     if label == None:
         continue
-    boxes, theta, rc_boxes=  label.get_field('obb_boxes').bbox.numpy(), label.get_field('theta').numpy(), label.bbox.numpy()
-    for bbox, angle, rc_box in zip(boxes, theta, rc_boxes):
+    pt_hws, boxes, theta, rc_boxes=label.get_field('pt_inbox').numpy(), label.get_field('obb_boxes').bbox.numpy(), label.get_field('theta').numpy(), label.bbox.numpy()
+    for bbox, angle, rc_box, pt_hw in zip(boxes, theta, rc_boxes, pt_hws):
         bbox = np.array(bbox, np.int32)
         bbox = [bbox[0]+bbox[2]/2, bbox[1]+bbox[3]/2, bbox[2], bbox[3]]
         rc_box = np.array(rc_box, np.int32)
     #    rect_rota = pts.reshape(2,2)
     #    rect_rota.a
+        
         rect_rota = ((bbox[0], bbox[1]), 
                     (bbox[2], bbox[3]), 
                    angle)
@@ -409,18 +438,23 @@ while i < size_data:
                 big_box[3]-big_box[1],
                 ]
         cv.drawContours(img,[box],0,(0,0,255),2)
+        print("box: ")
+        print(box)
+        print("angle: ")
+        print(angle)
         
-        
-    
         label = "d:{:.1f}".format(angle)
         cv.putText(img, label, (rc_box[0], rc_box[1] - 2), 0, 0.5, [225, 255, 255], 2)
         cv.rectangle(img, (big_box[0], big_box[1]), (big_box[2], big_box[3]), (0,255,0), 2)
         if i == 19:
             label = "H:{},W:{}".format(bbox[3], bbox[2])
             cv.putText(img, label, (big_box[0]+ 20, big_box[1] + 80), 0, 0.5, [225, 255, 255], 2)
-        
-        
-        box_recover = hrbb_anchor2obb_anchor(big_box_xywh, angle)
+#        if angle < 0:
+#            pt_hw = [box[1][1] - big_box[1], box[2][0] - big_box[0]]
+#        else:
+#            pt_hw = [box[0][1] - big_box[1], box[1][0] - big_box[0]]
+        box_recover = hrbb_anchor2hw_obb(big_box_xywh, pt_hw)
+        #print(pt_hw)
         cv.drawContours(img,[box_recover],0,(0,255,255),2)
         
         #cv.rectangle(img, (rc_box[0], rc_box[1]), (rc_box[2], rc_box[3]), (0,255,0), 2)

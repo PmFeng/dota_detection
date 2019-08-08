@@ -56,6 +56,31 @@ class FPNPredictorWithAngleIntegrated(nn.Module):
         bbox_deltas = self.bbox_pred(x)
 
         return scores, bbox_deltas
+    
+@registry.ROI_BOX_PREDICTOR.register("FPNPredictorWithHWIntegrated")
+class FPNPredictorWithHWIntegrated(nn.Module):
+    def __init__(self, cfg, in_channels):
+        super(FPNPredictorWithHWIntegrated, self).__init__()
+        num_classes = cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES
+        representation_size = in_channels
+
+        self.cls_score = nn.Linear(representation_size, num_classes)
+        num_bbox_reg_classes = 2 if cfg.MODEL.CLS_AGNOSTIC_BBOX_REG else num_classes
+        self.bbox_pred = nn.Linear(representation_size, num_bbox_reg_classes * 6)
+
+        nn.init.normal_(self.cls_score.weight, std=0.01)
+        nn.init.normal_(self.bbox_pred.weight, std=0.001)
+        for l in [self.cls_score, self.bbox_pred]:
+            nn.init.constant_(l.bias, 0)
+
+    def forward(self, x):
+        if x.ndimension() == 4:
+            assert list(x.shape[2:]) == [1, 1]
+            x = x.view(x.size(0), -1)
+        scores = self.cls_score(x)
+        bbox_deltas = self.bbox_pred(x)
+
+        return scores, bbox_deltas
 
 
 

@@ -69,7 +69,7 @@ class DOTA_Dataset(torch.utils.data.Dataset):
         else:
             self.keep_difficult = use_difficult
         self.transforms = transforms
-
+        
         self._annopath = os.path.join(self.root, "labelxml_voc", "%s.xml")
         self._imgpath = os.path.join(self.root, "images", "%s.png")
         self._imgsetpath = os.path.join(self.root, "ImageSets", "%s.txt")
@@ -118,21 +118,26 @@ class DOTA_Dataset(torch.utils.data.Dataset):
 #        target.add_field("difficult", anno["difficult"])
 #        return target
         
-#        if anno["hrbb_boxes"].size(0) > 700:
-#            fix_ind = np.random.randint(0, high=anno["hrbb_boxes"].size(0), size=700, dtype='l')
-#            anno["hrbb_boxes"] = anno["hrbb_boxes"][fix_ind]
-#            anno["obb_boxes"] = anno["obb_boxes"][fix_ind]
-#            anno["labels"] = anno["labels"][fix_ind]
-#            anno["difficult"] = anno["difficult"][fix_ind]
-#            anno["theta"] = anno["theta"][fix_ind]
+        if anno["hrbb_boxes"].size(0) > 500:
+            fix_ind = np.random.randint(0, high=anno["hrbb_boxes"].size(0), size=500, dtype='l')
+            anno["hrbb_boxes"] = anno["hrbb_boxes"][fix_ind]
+            anno["pt_inbox"] = anno["pt_inbox"][fix_ind]
+            anno["obb_boxes"] = anno["obb_boxes"][fix_ind]
+            anno["labels"] = anno["labels"][fix_ind]
+            anno["difficult"] = anno["difficult"][fix_ind]
+            anno["theta"] = anno["theta"][fix_ind]
         
         height, width = anno["im_info"]
-        target = BoxList(anno["hrbb_boxes"], (width, height), mode="xyxy")        
+        target = BoxList(anno["hrbb_boxes"], (width, height), mode="xyxy") 
         obb_target = BoxList(anno["obb_boxes"], (width, height), mode="xywh")
-        target.add_field("obb_boxes", obb_target)   
+        pt_inbox_target = BoxList(anno["pt_inbox"], (width, height), mode="xywh")
+        target.add_field("obb_boxes", obb_target)
+        target.add_field("pt_inbox", pt_inbox_target) 
         target.add_field("labels", anno["labels"])
         target.add_field("difficult", anno["difficult"])
         target.add_field("theta", anno["theta"])
+        
+        
         
 
         return target
@@ -148,6 +153,8 @@ class DOTA_Dataset(torch.utils.data.Dataset):
         #boxes = []
         obb_boxes = []
         hbb_boxes = []
+        hrbb_boxes = []
+        pt_inboxs = []
         gt_classes = []
         difficult_boxes = []
         thetas = []
@@ -179,11 +186,18 @@ class DOTA_Dataset(torch.utils.data.Dataset):
             
             theta = float(bb.find("box_ang").text)
             
+            theta = math.degrees(theta)
+            
+            if theta > 90.0:
+                theta -= 180
+            elif theta < -90.0:
+                theta += 180
+            
             
             
             hbb_box = ((OBB_box[0], OBB_box[1]),
                        (OBB_box[2], OBB_box[3]),
-                       math.degrees(theta))
+                       theta)
             hbb_box = cv.boxPoints(hbb_box)
             hbb_box = np.int0(hbb_box)
             
@@ -206,25 +220,24 @@ class DOTA_Dataset(torch.utils.data.Dataset):
                           OBB_box[2], OBB_box[3]]
             
             
+    
+            if theta < 0:
+                pt_h = hbb_box[1][1] - hrbb_box[1]
+                pt_w = hbb_box[2][0] - hrbb_box[0]
+                pt_inbox = [hrbb_bndbox[0], hrbb_bndbox[1], pt_w, pt_h]
+            else:
+                pt_h = hbb_box[0][1] - hrbb_box[1]
+                pt_w = hbb_box[1][0] - hrbb_box[0]
+                pt_inbox = [hrbb_bndbox[0], hrbb_bndbox[1], pt_w, pt_h]
             
-            
-            theta = float(bb.find("box_ang").text)
-            
-            theta = math.degrees(theta)
-            
-            if theta > 90.0:
-                theta -= 180
-            elif theta < -90.0:
-                theta += 180
-            elif theta == -90.0:
-                theta = 90
             
             
             thetas.append(theta)
             
-            
+            pt_inboxs.append(pt_inbox)
             obb_boxes.append(obb_bndbox)
-            hbb_boxes.append(hrbb_bndbox)
+            hbb_boxes.append(hbb_box)
+            hrbb_boxes.append(hrbb_bndbox)
             #gt_classes.append(self.class_to_ind[name])
             gt_classes.append(self.class_to_ind[name])
             difficult_boxes.append(difficult)
@@ -234,8 +247,10 @@ class DOTA_Dataset(torch.utils.data.Dataset):
         im_info = tuple(map(int, (size.find("height").text, size.find("width").text)))
 
         res = {
+            "pt_inbox": torch.tensor(pt_inboxs, dtype=torch.float32),
             "obb_boxes": torch.tensor(obb_boxes, dtype=torch.float32),
-            "hrbb_boxes": torch.tensor(hbb_boxes, dtype=torch.float32),
+            "hbb_boxes": torch.tensor(hbb_boxes, dtype=torch.float32),
+            "hrbb_boxes": torch.tensor(hrbb_boxes, dtype=torch.float32),
             "labels": torch.tensor(gt_classes),
             "difficult": torch.tensor(difficult_boxes),
             "theta": torch.tensor(thetas, dtype=torch.float32),

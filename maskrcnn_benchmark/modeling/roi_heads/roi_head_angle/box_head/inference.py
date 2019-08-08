@@ -7,7 +7,7 @@ from maskrcnn_benchmark.structures.bounding_box import BoxList
 from maskrcnn_benchmark.structures.boxlist_ops import boxlist_nms
 from maskrcnn_benchmark.structures.boxlist_ops import cat_boxlist
 #from maskrcnn_benchmark.modeling.box_coder_with_constrained_and_diff_angle import BoxCoder
-from maskrcnn_benchmark.modeling.box_coder_with_angle import BoxCoder
+from maskrcnn_benchmark.modeling.box_coder_with_only_hw import BoxCoder
 
 
 class PostProcessor_(nn.Module):
@@ -70,7 +70,7 @@ class PostProcessor_(nn.Module):
 
         if self.cls_agnostic_bbox_reg:
             box_regression = box_regression[:, -4:]
-        proposals, pre_thetas = self.box_coder.decode(
+        proposals, pred_pthw = self.box_coder.decode(
             box_regression.view(sum(boxes_per_image), -1), concat_boxes
         )
         
@@ -81,14 +81,14 @@ class PostProcessor_(nn.Module):
         num_classes = class_prob.shape[1]
 
         proposals = proposals.split(boxes_per_image, dim=0)
-        pre_thetas = pre_thetas.split(boxes_per_image, dim=0)
+        pred_pthw = pred_pthw.split(boxes_per_image, dim=0)
         class_prob = class_prob.split(boxes_per_image, dim=0)
 
         results = []
-        for prob, boxes_per_img, image_shape, lambda_ in zip(
-            class_prob, proposals, image_shapes, pre_thetas
+        for prob, boxes_per_img, image_shape, pred_pthw in zip(
+            class_prob, proposals, image_shapes, pred_pthw
         ):
-            boxlist = self.prepare_boxlist(boxes_per_img, prob, image_shape, lambda_)
+            boxlist = self.prepare_boxlist(boxes_per_img, prob, image_shape, pred_pthw)
             boxlist = boxlist.clip_to_image(remove_empty=False)
             if not self.bbox_aug_enabled:  # If bbox aug is enabled, we will do it later
                 boxlist = self.filter_results(boxlist, num_classes)
